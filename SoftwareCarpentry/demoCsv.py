@@ -118,6 +118,8 @@ def showUploads():
     
     return '<br>'.join(uploadsListPage)
 
+
+
 @route('/csvAsHtml/<filename>')
 def showCsvAsHtml(filename):
     queryParameters = dict(request.query)
@@ -148,9 +150,27 @@ def showCsvUploads():
     for f in files:
         if '.csv' in f:
             fileUrl = '%s/csvAsHtml/%s' % (baseUrl, f)
-            uploadsListPage.append('<a href=%s>%s</a>' % (fileUrl, f))
+            contentsLink = '<h3><a href=%s>%s</a></h3>' % (fileUrl, f)
+            fieldNamesLink = '<a href=%s/csvMetadata/fieldNames>Field Names</a>' % (fileUrl)
+            numRecordsLink = '<a href=%s/csvMetadata/numRecords>Number of records</a>' % (fileUrl)
+            print fieldNamesLink, numRecordsLink
+            links = (10*'&nbsp').join([contentsLink, fieldNamesLink, numRecordsLink])
+            uploadsListPage.append(links)
     return '<br>'.join(uploadsListPage)
                                     
+
+@route('/csvAsHtml/<filename>/csvMetadata/fieldNames')
+def returnFieldNames(filename):
+    with open(uploadLocation + '/' + filename) as f:
+        return f.readline().replace(',','<br>')
+    
+@route('/csvAsHtml/<filename>/csvMetadata/numRecords')
+def returnNumRecords(filename):
+    with open(uploadLocation + '/' + filename) as f:
+        for i, l in enumerate(f):
+            pass
+    return str(i)
+        
 
 @route('/youtube')
 def showVideo():

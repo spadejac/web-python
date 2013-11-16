@@ -23,13 +23,18 @@ def home():
     
     # Use of HTML is purposeful, to demonstrate that templates are not 
     # necessary for bottle
+    linksList.append('<b><u>Public Pages</b></u>')
     linksList.append('<a href=%s/showUploads>Show uploaded files</a>' % baseUrl)
     linksList.append('<a href=%s/showCsvUploads>Show uploaded CSV files</a>' % baseUrl)
     linksList.append('<br>')
+    
+    linksList.append('<b><u>Private Pages</b></u>')
     linksList.append('<a href=%s/login>Login</a>' % baseUrl)
     linksList.append('<a href=%s/uploadFile>Upload File</a>' % baseUrl)
     linksList.append('<a href=%s/logout>Logout</a>' % baseUrl)
     linksList.append('<br>')
+    
+    linksList.append('<b><u>Embedded Pages</b></u>')
     linksList.append('<a href=%s/youtube>Click me</a>' % baseUrl)
     
     

@@ -43,14 +43,17 @@ def home():
     homepage = '''
            <h1>Python web development using the Bottle Framework</h1>
            <h2>Software Carpentry bootcamp at LBNL - 18 Nov, 2013</h2>
+           <a href='http://www.software-carpentry.org'>Software Carpentry</a>
            <br><br><br>
            
            <u><b>Example Pages:</u></b>
            <br><br>
            %s
-           
-           <h3> Examples created by Manoj Pillay</h3>
-           
+           <br><br>
+           <a>Find source code for this web application on</a>
+           <a href='https://github.com/spadejac/web-python/tree/master/SoftwareCarpentry'>GitHub</a>
+           <br><br>
+           <b><i> Examples created by <a href='http://www.linkedin.com/in/manojpillay'></i>Manoj Pillay</b>
            
            ''' % (links)
 

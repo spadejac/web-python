@@ -6,7 +6,7 @@ Created on Nov 10, 2013
 '''
 
 
-from bottle import route, run, template, request, post, static_file
+from bottle import route, run, response, redirect, template, request, post, static_file
 from os import listdir
 import csv
 
@@ -23,11 +23,15 @@ def home():
     
     # Use of HTML is purposeful, to demonstrate that templates are not 
     # necessary for bottle
-    linksList.append('<a href=%s/login>Login Test</a>' % baseUrl)
-    linksList.append('<a href=%s/uploadFile>Upload File</a>' % baseUrl)
     linksList.append('<a href=%s/showUploads>Show uploaded files</a>' % baseUrl)
     linksList.append('<a href=%s/showCsvUploads>Show uploaded CSV files</a>' % baseUrl)
+    linksList.append('<br>')
+    linksList.append('<a href=%s/login>Login</a>' % baseUrl)
+    linksList.append('<a href=%s/uploadFile>Upload File</a>' % baseUrl)
+    linksList.append('<a href=%s/logout>Logout</a>' % baseUrl)
+    linksList.append('<br>')
     linksList.append('<a href=%s/youtube>Click me</a>' % baseUrl)
+    
     
     links = '<br>'.join(linksList)
     
@@ -50,12 +54,19 @@ def home():
 
 @route('/uploadFile')
 def upload():
-    return '''
-           <form action="/upload" method="post" enctype="multipart/form-data">
-               Select a file: <input type="file" name="upload" />
-               <input type="submit" value="Start upload" />
-           </form>
-           '''
+    username = request.get_cookie("account", secret='some-secret-key')
+    if username:
+        return '''
+               <form action="/upload" method="post" enctype="multipart/form-data">
+                  Select a file: <input type="file" name="upload" />
+                  <input type="submit" value="Start upload" />
+               </form>
+                ''' 
+    
+    else:
+        return "You are not logged in. Access denied."
+    
+    return 
 
 
 @route('/upload', method='POST')
@@ -78,6 +89,13 @@ def login():
             <input value="Login" type="submit" />
         </form>
     '''
+    
+@route('/logout')
+def logout():
+    response.delete_cookie('account')
+    return '''
+           You have successfully logged out of the restrcited area!
+           '''
 
 def check_login(username, password):
     passwords = {
@@ -99,6 +117,7 @@ def do_login():
     username = request.forms.get('username')
     password = request.forms.get('password')
     if check_login(username, password):
+        response.set_cookie("account", username, secret='some-secret-key')
         return "<p>Your login information was correct.</p>"
     else:
         return "<p>Login failed.</p>"
@@ -120,31 +139,89 @@ def showUploads():
 
 
 
+def displayCsvHtmlTemplate(rows):
+    return template('html', {'rows':rows})
+
 @route('/csvAsHtml/<filename>')
 def showCsvAsHtml(filename):
-    queryParameters = dict(request.query)
+    start = 1
+    end = getNumRecords(filename)
+    redirect('/csvAsHtml/%s/filter/%d/%d' %(filename, start, end))
+#     Alternatively, one could directly call the function as follows:
+#     return showFilteredRows(filename, start, end)
+                                    
+
+def getFieldNames(filename):
+    with open(filename) as f:
+        for row in csv.reader([f.readline()]):
+            return row
     
-    filename = uploadLocation + '/' + filename 
-    rows = []
-    keysToDisplay = queryParameters.keys()
+@route('/csvAsHtml/<filename>/csvMetadata/fieldNames')
+def returnFieldNames(filename):
+    filename = uploadLocation + '/' + filename
+    fieldNamesList = getFieldNames(filename)
+    return '<br>'.join(fieldNamesList)
+
     
-    with open(filename) as csvFile:
-        if keysToDisplay:
-            csvDict = csv.DictReader(csvFile)
-            rows.append(keysToDisplay)
-            for record in csvDict:
-                row = []
-                for key in record:
-                        if key in keysToDisplay:
-                            row.append(record[key])
-                rows.append(row)
-        else:
-            rows = list(tuple(rec) for rec in csv.reader(csvFile))
-    return template('html', {'rows':rows})
+def getNumRecords(filename):
+    filename = uploadLocation + '/' + filename
+    with open(filename) as f:
+        for i, l in enumerate(f):
+            pass
+    return i
+
+@route('/csvAsHtml/<filename>/csvMetadata/numRecords')
+def returnNumRecords(filename):
+    return str(getNumRecords(filename))
         
-    
+@route('/csvAsHtml/<filename>/filter/<start:int>/<end:int>')
+def showFilteredRows(filename, start, end):
+    try:
+        assert start <= end
+        assert isinstance(start,int)
+        assert isinstance(end,int)
+        
+        filename = uploadLocation + '/' + filename    
+        queryParameters = dict(request.query)
+        keysToDisplay = queryParameters.keys()       
+        if not keysToDisplay:
+            keysToDisplay = getFieldNames(filename)
+         
+        rows = [keysToDisplay]
+        lineNum = 0
+        
+        
+        with open(filename) as csvFile:
+            csvDict = csv.DictReader(csvFile)
+            for record in csvDict:
+        
+                lineNum += 1
+                if start <= lineNum <= end:
+                    row = []
+                    row = [record.get(key,'') for key in keysToDisplay]
+                    if row:
+                        rows.append(row)
+        
+        return displayCsvHtmlTemplate(rows)
+
+    except Exception, e:
+        return '''
+               URL was constructed incorrectly: %s
+               ''' %str(e)
+        
+@post('/filterCsv/<filename>') 
+def call_showFilteredRows(filename):
+    start = int(request.forms.get('start'))
+    end = int(request.forms.get('end'))
+    if start <= end:
+        return showFilteredRows(filename, start, end)
+    else:
+        return 'start cannot be greater than end'
+
+
 @route('/showCsvUploads')
 def showCsvUploads():
+
     files = listdir(uploadLocation)
     uploadsListPage = []
     for f in files:
@@ -153,24 +230,21 @@ def showCsvUploads():
             contentsLink = '<h3><a href=%s>%s</a></h3>' % (fileUrl, f)
             fieldNamesLink = '<a href=%s/csvMetadata/fieldNames>Field Names</a>' % (fileUrl)
             numRecordsLink = '<a href=%s/csvMetadata/numRecords>Number of records</a>' % (fileUrl)
-            print fieldNamesLink, numRecordsLink
-            links = (10*'&nbsp').join([contentsLink, fieldNamesLink, numRecordsLink])
+            filterForm = '''
+                         <form action="/filterCsv/%s" method="post" >
+                              start: <input name="start" type="text" />
+                              end: <input name="end" type="text" />
+                              <input value="Filter" type="submit" />
+                         </form>
+                         ''' %f
+            
+            links = (5*'&nbsp').join([contentsLink, fieldNamesLink, 
+                                       numRecordsLink, filterForm])
             uploadsListPage.append(links)
     return '<br>'.join(uploadsListPage)
-                                    
 
-@route('/csvAsHtml/<filename>/csvMetadata/fieldNames')
-def returnFieldNames(filename):
-    with open(uploadLocation + '/' + filename) as f:
-        return f.readline().replace(',','<br>')
-    
-@route('/csvAsHtml/<filename>/csvMetadata/numRecords')
-def returnNumRecords(filename):
-    with open(uploadLocation + '/' + filename) as f:
-        for i, l in enumerate(f):
-            pass
-    return str(i)
-        
+
+
 
 @route('/youtube')
 def showVideo():

@@ -73,8 +73,6 @@ def upload():
     
     else:
         return "You are not logged in. Access denied."
-    
-    return 
 
 
 @route('/upload', method='POST')
